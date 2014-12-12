@@ -21,6 +21,7 @@ import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -58,6 +59,8 @@ import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.NetworkControllerImpl.EmergencyListener;
 import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.UserInfoController;
+import com.android.systemui.statusbar.policy.WeatherController;
+import com.android.systemui.statusbar.policy.WeatherControllerImpl;
 import com.android.systemui.tuner.TunerService;
 
 import java.text.NumberFormat;
@@ -66,12 +69,14 @@ import java.text.NumberFormat;
  * The view to manage the header area in the expanded status bar.
  */
 public class StatusBarHeaderView extends RelativeLayout implements View.OnClickListener,
-        NextAlarmController.NextAlarmChangeCallback, EmergencyListener {
+        NextAlarmController.NextAlarmChangeCallback, EmergencyListener,
+        WeatherController.Callback {
 
     private boolean mExpanded;
     private boolean mListening;
 
     private ViewGroup mSystemIconsContainer;
+    private ViewGroup mWeatherContainer;
     private View mSystemIconsSuperContainer;
     private View mDateGroup;
     private View mClock;
@@ -92,6 +97,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
     private TextView mEmergencyCallsOnly;
     private BatteryLevelTextView mBatteryLevel;
     private TextView mAlarmStatus;
+    private TextView mWeatherLine1, mWeatherLine2;
 
     private boolean mShowEmergencyCallsOnly;
     private boolean mAlarmShowing;
@@ -121,6 +127,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
     private ActivityStarter mActivityStarter;
     private BatteryController mBatteryController;
     private NextAlarmController mNextAlarmController;
+    private WeatherController mWeatherController;
     private QSPanel mQSPanel;
 
     private final Rect mClipBounds = new Rect();
@@ -137,6 +144,8 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
 
     private SettingsObserver mSettingsObserver;
     private boolean mShowBatteryTextExpanded;
+
+    private boolean mShowWeather;
 
     public StatusBarHeaderView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -170,6 +179,10 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         mAlarmStatus.setOnClickListener(this);
         mSignalCluster = findViewById(R.id.signal_cluster);
         mSystemIcons = (LinearLayout) findViewById(R.id.system_icons);
+        mWeatherContainer = (LinearLayout) findViewById(R.id.weather_container);
+        mWeatherContainer.setOnClickListener(this);
+        mWeatherLine1 = (TextView) findViewById(R.id.weather_line_1);
+        mWeatherLine2 = (TextView) findViewById(R.id.weather_line_2);
         mSettingsObserver = new SettingsObserver(new Handler());
         loadDimens();
         updateVisibilities();
@@ -290,6 +303,10 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         mNextAlarmController = nextAlarmController;
     }
 
+    public void setWeatherController(WeatherController weatherController) {
+        mWeatherController = weatherController;
+    }
+
     public int getCollapsedHeight() {
         return mCollapsedHeight;
     }
@@ -341,6 +358,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         mAlarmStatus.setVisibility(mExpanded && mAlarmShowing ? View.VISIBLE : View.INVISIBLE);
         mSettingsContainer.setVisibility(mExpanded ? View.VISIBLE : View.INVISIBLE);
         mQsDetailHeader.setVisibility(mExpanded && mShowingDetail ? View.VISIBLE : View.INVISIBLE);
+        mWeatherContainer.setVisibility(mExpanded && mShowWeather ? View.VISIBLE : View.GONE);
         if (mSignalCluster != null) {
             updateSignalClusterDetachment();
         }
@@ -384,8 +402,10 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         if (mListening) {
             mSettingsObserver.observe();
             mNextAlarmController.addStateChangedCallback(this);
+            mWeatherController.addCallback(this);
         } else {
             mNextAlarmController.removeStateChangedCallback(this);
+            mWeatherController.removeCallback(this);
             mSettingsObserver.unobserve();
         }
     }
@@ -423,6 +443,19 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         mAlarmShowing = nextAlarm != null;
         updateEverything();
         requestCaptureValues();
+    }
+
+    @Override
+    public void onWeatherChanged(WeatherController.WeatherInfo info) {
+        if (info.temp == null || info.condition == null) {
+            mWeatherLine1.setText(null);
+        } else {
+            mWeatherLine1.setText(mContext.getString(
+                    R.string.status_bar_expanded_header_weather_format,
+                    info.temp,
+                    info.condition));
+        }
+        mWeatherLine2.setText(info.city);
     }
 
     private void updateClickTargets() {
@@ -507,6 +540,8 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
             startSettingsActivity();
         } else if (v == mSystemIconsSuperContainer) {
             startBatteryActivity();
+        } else if (v == mWeatherContainer) {
+            startForecastActivity();
         } else if (v == mAlarmStatus && mNextAlarm != null) {
             PendingIntent showIntent = mNextAlarm.getShowIntent();
             if (showIntent != null && showIntent.isActivity()) {
@@ -523,6 +558,13 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
     private void startBatteryActivity() {
         mActivityStarter.startActivity(new Intent(Intent.ACTION_POWER_USAGE_SUMMARY),
                 true /* dismissShade */);
+    }
+
+    private void startForecastActivity() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.setComponent(WeatherControllerImpl.COMPONENT_WEATHER_FORECAST);
+        mActivityStarter.startActivity(intent, true /* dismissShade */);
     }
 
     public void setQSPanel(QSPanel qsp) {
@@ -567,6 +609,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         target.avatarScale = mMultiUserAvatar.getScaleX();
         target.avatarX = mMultiUserSwitch.getLeft() + mMultiUserAvatar.getLeft();
         target.avatarY = mMultiUserSwitch.getTop() + mMultiUserAvatar.getTop();
+        target.weatherY = mClock.getBottom() - mWeatherLine1.getHeight();
         if (getLayoutDirection() == LAYOUT_DIRECTION_LTR) {
             target.batteryX = mSystemIconsSuperContainer.getLeft()
                     + mSystemIconsContainer.getRight();
@@ -605,6 +648,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         mTime.setScaleY(values.timeScale);
         mClock.setY(values.clockY - mClock.getHeight());
         mDateGroup.setY(values.dateY);
+        mWeatherContainer.setY(values.weatherY);
         mAlarmStatus.setY(values.dateY - mAlarmStatus.getPaddingTop());
         mMultiUserAvatar.setScaleX(values.avatarScale);
         mMultiUserAvatar.setScaleY(values.avatarScale);
@@ -645,6 +689,8 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         applyAlpha(mDateExpanded, values.dateExpandedAlpha);
         applyAlpha(mBatteryLevel, values.batteryLevelAlpha);
         applyAlpha(mSettingsContainer, values.settingsAlpha);
+        applyAlpha(mWeatherLine1, values.settingsAlpha);
+        applyAlpha(mWeatherLine2, values.settingsAlpha);
         applyAlpha(mSignalCluster, values.signalClusterAlpha);
         if (!mExpanded) {
             mTime.setScaleX(1f);
@@ -677,6 +723,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         float settingsTranslation;
         float signalClusterAlpha;
         float settingsRotation;
+        float weatherY;
 
         public void interpoloate(LayoutValues v1, LayoutValues v2, float t) {
             timeScale = v1.timeScale * (1 - t) + v2.timeScale * t;
@@ -688,6 +735,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
             batteryX = v1.batteryX * (1 - t) + v2.batteryX * t;
             batteryY = v1.batteryY * (1 - t) + v2.batteryY * t;
             settingsTranslation = v1.settingsTranslation * (1 - t) + v2.settingsTranslation * t;
+            weatherY = v1.weatherY * (1 - t) + v2.weatherY * t;
 
             float t1 = Math.max(0, t - 0.5f) * 2;
             settingsRotation = v1.settingsRotation * (1 - t1) + v2.settingsRotation * t1;
@@ -763,6 +811,7 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
             final boolean showingDetail = detail != null;
             transition(mClock, !showingDetail);
             transition(mDateGroup, !showingDetail);
+            transition(mWeatherContainer, !showingDetail);
             if (mAlarmShowing) {
                 transition(mAlarmStatus, !showingDetail);
             }
@@ -826,6 +875,8 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
                     Settings.System.STATUS_BAR_BATTERY_STYLE), false, this);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.STATUS_BAR_SHOW_BATTERY_PERCENT), false, this);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.STATUS_BAR_SHOW_WEATHER), false, this);
             update();
         }
 
@@ -851,6 +902,8 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
                     Settings.System.STATUS_BAR_BATTERY_STYLE, 0, currentUserId);
             boolean showExpandedBatteryPercentage = Settings.System.getIntForUser(resolver,
                     Settings.System.STATUS_BAR_SHOW_BATTERY_PERCENT, 0, currentUserId) == 0;
+            mShowWeather = Settings.System.getInt(
+                    resolver, Settings.System.STATUS_BAR_SHOW_WEATHER, 1) == 1;
 
             switch (batteryStyle) {
                 case 4: //BATTERY_METER_GONE
