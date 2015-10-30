@@ -218,8 +218,8 @@ public class AlertDialog extends Dialog implements DialogInterface {
             return R.style.Theme_DeviceDefault_Dialog_Alert;
         } else if (themeResId == THEME_DEVICE_DEFAULT_LIGHT) {
             return R.style.Theme_DeviceDefault_Light_Dialog_Alert;
-+        } else if (themeResId == THEME_MATERIAL_DAYNIGHT) {
-+            return com.android.internal.R.style.Theme.Material.DayNight.Dialog.Alert;
+        } else if (themeResId == THEME_MATERIAL_DAYNIGHT) {
+            return com.android.internal.R.style.Theme.Material.DayNight.Dialog.Alert;
         } else if (themeResId >= 0x01000000) {   // start of real resource IDs.
             return themeResId;
         } else {
