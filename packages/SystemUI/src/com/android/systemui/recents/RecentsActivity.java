@@ -25,6 +25,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -50,6 +51,7 @@ import com.android.systemui.recents.views.DebugOverlayView;
 import com.android.systemui.recents.views.RecentsView;
 import com.android.systemui.recents.views.SystemBarScrimViews;
 import com.android.systemui.recents.views.ViewAnimation;
+import com.android.systemui.recents.RecentsConfiguration;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -192,8 +194,6 @@ public class RecentsActivity extends Activity implements RecentsView.RecentsView
         // If AlternateRecentsComponent has preloaded a load plan, then use that to prevent
         // reconstructing the task stack
 
-        boolean mRecentsSearchbar = Settings.System.getInt(
-                getContentResolver(), Settings.System.RECENTS_SEARCH_BAR, 1) == 1;
         RecentsTaskLoader loader = RecentsTaskLoader.getInstance();
         RecentsTaskLoadPlan plan = Recents.consumeInstanceLoadPlan();
         if (plan == null) {
@@ -268,11 +268,35 @@ public class RecentsActivity extends Activity implements RecentsView.RecentsView
             }
             findViewById(R.id.floating_action_button).setVisibility(View.VISIBLE);
             if (mRecentsView.hasValidSearchBar()) {
-                mRecentsView.setSearchBarVisibility(mRecentsSearchbar ? View.VISIBLE : View.GONE);
+
+                if (Settings.System.getInt(getContentResolver(),
+                    Settings.System.RECENTS_SHOW_HIDE_SEARCH_BAR, 1) != 1) {
+                    mRecentsView.setSearchBarVisibility(View.VISIBLE);
+                } else {
+                    mRecentsView.setSearchBarVisibility(View.GONE);
+                   }
+                } else {
+                if (Settings.System.getInt(getContentResolver(),
+                    Settings.System.RECENTS_SHOW_HIDE_SEARCH_BAR, 1) != 1) {
+                    addSearchBarAppWidgetView();
             } else {
-                refreshSearchWidgetView();
+		}
             }
         }
+
+	// Update search bar space height
+        Resources reso = getResources();
+
+        if (Settings.System.getInt(getContentResolver(),
+                    Settings.System.RECENTS_SHOW_HIDE_SEARCH_BAR, 1) != 0) {
+        RecentsConfiguration.searchBarSpaceHeightPx = 0;
+
+		}
+
+        if (Settings.System.getInt(getContentResolver(),
+                    Settings.System.RECENTS_SHOW_HIDE_SEARCH_BAR, 1) != 1) {
+	RecentsConfiguration.searchBarSpaceHeightPx = reso.getDimensionPixelSize(R.dimen.recents_search_bar_space_height);
+		}
 
         // Animate the SystemUI scrims into view
         mScrimViews.prepareEnterRecentsAnimation();
