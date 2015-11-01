@@ -3510,10 +3510,10 @@ public final class Settings {
         public static final String RECENTS_CLEAR_ALL_LOCATION = "recents_clear_all_location";
 
         /**
-         * Recents Show/Hide Search Bar
+         * Whether to show or hide search bar in recents view
          * @hide
          */
-        public static final String RECENTS_SHOW_HIDE_SEARCH_BAR = "recents_show_hide_search_bar";
+        public static final String RECENTS_SEARCH_BAR = "recents_search_bar";
 
 	/**
          * Whether to display sound panel in the power menu
