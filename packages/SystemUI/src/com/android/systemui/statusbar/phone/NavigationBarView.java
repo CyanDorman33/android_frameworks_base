@@ -296,8 +296,6 @@ public class NavigationBarView extends LinearLayout {
         mBackAltLandIcon = res.getDrawable(R.drawable.ic_sysbar_back_ime_land);
         mRecentIcon = res.getDrawable(R.drawable.ic_sysbar_recent);
         mRecentLandIcon = res.getDrawable(R.drawable.ic_sysbar_recent_land);
-        mHomeIcon = res.getDrawable(R.drawable.ic_sysbar_home);
-        mHomeLandIcon = res.getDrawable(R.drawable.ic_sysbar_home_land);
     }
 
     @Override
