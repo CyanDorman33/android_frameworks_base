@@ -923,9 +923,6 @@ public class PackageManagerService extends IPackageManager.Stub {
     // Stores a list of users whose package restrictions file needs to be updated
     private ArraySet<Integer> mDirtyUsers = new ArraySet<Integer>();
 
-    WindowManager mWindowManager;
-    private final WindowManagerPolicy mPolicy; // to set packageName
-
     final private DefaultContainerConnection mDefContainerConn =
             new DefaultContainerConnection();
     class DefaultContainerConnection implements ServiceConnection {
@@ -1856,11 +1853,6 @@ public class PackageManagerService extends IPackageManager.Stub {
             mDefParseFlags = 0;
             mSeparateProcesses = null;
         }
-
-        mWindowManager = (WindowManager)context.getSystemService(Context.WINDOW_SERVICE);
-        Display d = mWindowManager.getDefaultDisplay();
-        mPolicy = new PhoneWindowManager();
-        d.getMetrics(mMetrics);
 
         mInstaller = installer;
         mPackageDexOptimizer = new PackageDexOptimizer(this);
@@ -6210,14 +6202,6 @@ public class PackageManagerService extends IPackageManager.Stub {
         }
         if (!isFirstBoot()) {
             try {
-                // give the packagename to the PhoneWindowManager
-                ApplicationInfo ai;
-                try {
-                    ai = mContext.getPackageManager().getApplicationInfo(pkg.packageName, 0);
-                } catch (Exception e) {
-                    ai = null;
-                }
-                mPolicy.setPackageName((String) (ai != null ? mContext.getPackageManager().getApplicationLabel(ai) : pkg.packageName));
 
                 ActivityManagerNative.getDefault().showBootMessage(
                         mContext.getResources().getString(R.string.android_upgrading_apk,
