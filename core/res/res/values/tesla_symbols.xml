@@ -249,5 +249,7 @@
   <java-symbol type="drawable" name="busy_dlg_animation_123" />
   <java-symbol type="drawable" name="busy_dlg_animation_124" />
   <java-symbol type="drawable" name="busy_dlg_animation_125" />
-
+  <java-symbol type="id" name="busy_dlg_animation" />
+  <java-symbol type="id" name="busy_dlg_title" />
+  <java-symbol type="layout" name="busy_dlg" />    
 </resources>
