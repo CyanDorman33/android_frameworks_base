@@ -170,7 +170,7 @@ public final class ShutdownThread extends Thread {
                             .setTitle(titleResourceId)
                             .setSingleChoiceItems(
                                     com.android.internal.R.array.shutdown_reboot_options,
-                                    0, new DialogInterface.OnClickListener() {                                    new DialogInterface.OnClickListener() {
+                                    0, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     if (which < 0)
                                         return;
@@ -180,7 +180,6 @@ public final class ShutdownThread extends Thread {
 
                                     if (actions != null && which < actions.length) {
                                         mRebootReason = actions[which];
-
                                         if (actions[which].equals(HOT_REBOOT)) {
                                             mRebootHot = true;
                                         }
@@ -228,7 +227,7 @@ public final class ShutdownThread extends Thread {
                             });
                 }
             }
-
+            
             if (sConfirmDialog == null) {
                 sConfirmDialog = new AlertDialog.Builder(context)
                         .setTitle(titleResourceId)
