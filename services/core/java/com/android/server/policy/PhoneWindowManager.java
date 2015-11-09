@@ -84,7 +84,6 @@ import android.service.dreams.IDreamManager;
 import android.service.gesture.EdgeGestureManager;
 import android.speech.RecognizerIntent;
 import android.telecom.TelecomManager;
-import android.text.Html;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.view.LayoutInflater;
@@ -6416,7 +6415,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     } else {
                         mBootMsgDialog.setTitle(R.string.android_start_title);
                     }
-                    mBootMsgDialog.setIndeterminate(true);
                     mBootMsgDialog.getWindow().setType(
                             WindowManager.LayoutParams.TYPE_BOOT_PROGRESS);
                     mBootMsgDialog.getWindow().addFlags(

@@ -195,8 +195,6 @@ import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 import android.util.Xml;
 import android.view.Display;
-import android.view.WindowManager;
-import android.view.WindowManagerPolicy;
 
 import dalvik.system.DexFile;
 import dalvik.system.VMRuntime;
@@ -222,7 +220,6 @@ import com.android.server.EventLogTags;
 import com.android.server.FgThread;
 import com.android.server.IntentResolver;
 import com.android.server.LocalServices;
-import com.android.server.policy.PhoneWindowManager;
 import com.android.server.ServiceThread;
 import com.android.server.SystemConfig;
 import com.android.server.Watchdog;
