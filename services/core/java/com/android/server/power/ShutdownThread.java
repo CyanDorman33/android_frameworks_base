@@ -72,12 +72,6 @@ public final class ShutdownThread extends Thread {
     private static final int MAX_SHUTDOWN_WAIT_TIME = 20*1000;
     private static final int MAX_RADIO_WAIT_TIME = 12*1000;
     private static final int MAX_UNCRYPT_WAIT_TIME = 15*60*1000;
-    // constants for progress bar. the values are roughly estimated based on timeout.
-    private static final int BROADCAST_STOP_PERCENT = 2;
-    private static final int ACTIVITY_MANAGER_STOP_PERCENT = 4;
-    private static final int PACKAGE_MANAGER_STOP_PERCENT = 6;
-    private static final int RADIO_STOP_PERCENT = 18;
-    private static final int MOUNT_SERVICE_STOP_PERCENT = 20;
 
     // length of vibration before shutting down
     private static final int SHUTDOWN_VIBRATE_MS = 500;
@@ -86,13 +80,11 @@ public final class ShutdownThread extends Thread {
     private static Object sIsStartedGuard = new Object();
     private static boolean sIsStarted = false;
 
-    // uncrypt status files
+    // uncrypt status file
     private static final String UNCRYPT_STATUS_FILE = "/cache/recovery/uncrypt_status";
-    private static final String UNCRYPT_PACKAGE_FILE = "/cache/recovery/uncrypt_file";
 
     private static boolean mReboot;
     private static boolean mRebootSafeMode;
-    private static boolean mRebootUpdate;
     private static boolean mRebootHot;
 
     private static String mRebootReason;
@@ -310,7 +302,6 @@ public final class ShutdownThread extends Thread {
     public static void reboot(final Context context, String reason, boolean confirm) {
         mReboot = true;
         mRebootSafeMode = false;
-        mRebootUpdate = false;
         mRebootReason = reason;
         shutdownInner(context, confirm);
     }
@@ -330,7 +321,6 @@ public final class ShutdownThread extends Thread {
 
         mReboot = true;
         mRebootSafeMode = true;
-        mRebootUpdate = false;
         mRebootReason = null;
         shutdownInner(context, confirm);
     }
@@ -347,45 +337,17 @@ public final class ShutdownThread extends Thread {
         // Throw up a system dialog to indicate the device is rebooting / shutting down.
         PacBusyDialog pd = new PacBusyDialog(context, android.R.style.Theme_Translucent_NoTitleBar);
 
-        // Path 1: Reboot to recovery and install the update
-        //   Condition: mRebootReason == REBOOT_RECOVERY and mRebootUpdate == True
-        //   (mRebootUpdate is set by checking if /cache/recovery/uncrypt_file exists.)
-        //   UI: progress bar
-        //
-        // Path 2: Reboot to recovery for factory reset
-        //   Condition: mRebootReason == REBOOT_RECOVERY
-        //   UI: spinning circle only (no progress bar)
-        //
-        // Path 3: Regular reboot / shutdown
-        //   Condition: Otherwise
-        //   UI: spinning circle only (no progress bar)
+        // throw up an indeterminate system dialog to indicate radio is
+        // shutting down.
+        ProgressDialog pd = new ProgressDialog(context);
         if (PowerManager.REBOOT_RECOVERY.equals(mRebootReason)) {
-            mRebootUpdate = new File(UNCRYPT_PACKAGE_FILE).exists();
-            if (mRebootUpdate) {
-                pd.setTitle(context.getText(com.android.internal.R.string.reboot_to_update_title));
-                pd.setMessage(context.getText(
-                        com.android.internal.R.string.reboot_to_update_prepare));
-                pd.setMax(100);
-                pd.setProgressNumberFormat(null);
-                pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-                pd.setProgress(0);
-                pd.setIndeterminate(false);
-            } else {
-                // Factory reset path. Set the dialog message accordingly.
-                pd.setTitle(context.getText(com.android.internal.R.string.reboot_reboot));
-                pd.setMessage(context.getText(
-                        com.android.internal.R.string.reboot_progress));
-                pd.setIndeterminate(true);
-            }
-        } else if (mReboot) {
-            pd.setTitle(context.getText(com.android.internal.R.string.reboot_system));
-            pd.setMessage(context.getText(com.android.internal.R.string.reboot_progress));
-            pd.setIndeterminate(true);
+            pd.setTitle(context.getText(com.android.internal.R.string.reboot_to_recovery_title));
         } else {
             pd.setTitle(context.getText(com.android.internal.R.string.power_off));
-            pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
         }
-        //pd.setIndeterminate(true);
+        pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
+        pd.setIndeterminate(true);
+        pd.setCancelable(false);
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 			pd.getWindow().addFlags(
                  WindowManager.LayoutParams.FLAG_DIM_BEHIND
@@ -483,19 +445,12 @@ public final class ShutdownThread extends Thread {
                 if (delay <= 0) {
                     Log.w(TAG, "Shutdown broadcast timed out");
                     break;
-                } else if (mRebootUpdate) {
-                    int status = (int)((MAX_BROADCAST_TIME - delay) * 1.0 *
-                            BROADCAST_STOP_PERCENT / MAX_BROADCAST_TIME);
-                    sInstance.setRebootProgress(status, null);
                 }
                 try {
-                    mActionDoneSync.wait(Math.min(delay, PHONE_STATE_POLL_SLEEP_MSEC));
+                    mActionDoneSync.wait(delay);
                 } catch (InterruptedException e) {
                 }
             }
-        }
-        if (mRebootUpdate) {
-            sInstance.setRebootProgress(BROADCAST_STOP_PERCENT, null);
         }
 
         Log.i(TAG, "Shutting down activity manager...");
@@ -508,9 +463,6 @@ public final class ShutdownThread extends Thread {
             } catch (RemoteException e) {
             }
         }
-        if (mRebootUpdate) {
-            sInstance.setRebootProgress(ACTIVITY_MANAGER_STOP_PERCENT, null);
-        }
 
         Log.i(TAG, "Shutting down package manager...");
 
@@ -519,15 +471,9 @@ public final class ShutdownThread extends Thread {
         if (pm != null) {
             pm.shutdown();
         }
-        if (mRebootUpdate) {
-            sInstance.setRebootProgress(PACKAGE_MANAGER_STOP_PERCENT, null);
-        }
 
         // Shutdown radios.
         shutdownRadios(MAX_RADIO_WAIT_TIME);
-        if (mRebootUpdate) {
-            sInstance.setRebootProgress(RADIO_STOP_PERCENT, null);
-        }
 
         // Shutdown MountService to ensure media is in a safe state
         IMountShutdownObserver observer = new IMountShutdownObserver.Stub() {
@@ -559,44 +505,64 @@ public final class ShutdownThread extends Thread {
                 if (delay <= 0) {
                     Log.w(TAG, "Shutdown wait timed out");
                     break;
-                } else if (mRebootUpdate) {
-                    int status = (int)((MAX_SHUTDOWN_WAIT_TIME - delay) * 1.0 *
-                            (MOUNT_SERVICE_STOP_PERCENT - RADIO_STOP_PERCENT) /
-                            MAX_SHUTDOWN_WAIT_TIME);
-                    status += RADIO_STOP_PERCENT;
-                    sInstance.setRebootProgress(status, null);
                 }
                 try {
-                    mActionDoneSync.wait(Math.min(delay, PHONE_STATE_POLL_SLEEP_MSEC));
+                    mActionDoneSync.wait(delay);
                 } catch (InterruptedException e) {
                 }
             }
         }
-        if (mRebootUpdate) {
-            sInstance.setRebootProgress(MOUNT_SERVICE_STOP_PERCENT, null);
 
-            // If it's to reboot to install update, invoke uncrypt via init service.
+        // If it's to reboot into recovery, invoke uncrypt via init service.
+        if (PowerManager.REBOOT_RECOVERY.equals(mRebootReason)) {
             uncrypt();
         }
 
         rebootOrShutdown(mContext, mReboot, mRebootReason);
     }
 
-    private void setRebootProgress(final int progress, final CharSequence message) {
+    private void prepareUncryptProgress() {
+        // Reset the dialog message to show the decrypt process.
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mProgressDialog != null) {
+                    mProgressDialog.dismiss();
+                }
+                // It doesn't work to change the style of the existing
+                // one. Have to create a new one.
+                ProgressDialog pd = new ProgressDialog(mContext);
+
+                pd.setTitle(mContext.getText(
+                        com.android.internal.R.string.reboot_to_recovery_title));
+                pd.setMessage(mContext.getText(
+                        com.android.internal.R.string.reboot_to_recovery_progress));
+                pd.setIndeterminate(false);
+                pd.setMax(100);
+                pd.setCancelable(false);
+                pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+                pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                pd.setProgressNumberFormat(null);
+                pd.setProgress(0);
+
+                mProgressDialog = pd;
+                mProgressDialog.show();
+            }
+        });
+    }
+
+    private void setUncryptProgress(final int progress) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 if (mProgressDialog != null) {
                     mProgressDialog.setProgress(progress);
-                    if (message != null) {
-                        mProgressDialog.setMessage(message);
-                    }
                 }
             }
         });
     }
 
-    private void shutdownRadios(final int timeout) {
+    private void shutdownRadios(int timeout) {
         // If a radio is wedged, disabling it may hang so we do this work in another thread,
         // just in case.
         final long endTime = SystemClock.elapsedRealtime() + timeout;
@@ -651,15 +617,7 @@ public final class ShutdownThread extends Thread {
 
                 Log.i(TAG, "Waiting for NFC, Bluetooth and Radio...");
 
-                long delay = endTime - SystemClock.elapsedRealtime();
-                while (delay > 0) {
-                    if (mRebootUpdate) {
-                        int status = (int)((timeout - delay) * 1.0 *
-                                (RADIO_STOP_PERCENT - PACKAGE_MANAGER_STOP_PERCENT) / timeout);
-                        status += PACKAGE_MANAGER_STOP_PERCENT;
-                        sInstance.setRebootProgress(status, null);
-                    }
-
+                while (SystemClock.elapsedRealtime() < endTime) {
                     if (!bluetoothOff) {
                         try {
                             bluetoothOff = !bluetooth.isEnabled();
@@ -700,8 +658,6 @@ public final class ShutdownThread extends Thread {
                         break;
                     }
                     SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);
-
-                    delay = endTime - SystemClock.elapsedRealtime();
                 }
             }
         };
@@ -754,6 +710,9 @@ public final class ShutdownThread extends Thread {
     private void uncrypt() {
         Log.i(TAG, "Calling uncrypt and monitoring the progress...");
 
+        // Update the ProcessDialog message and style.
+        sInstance.prepareUncryptProgress();
+
         final boolean[] done = new boolean[1];
         done[0] = false;
         Thread t = new Thread() {
@@ -774,32 +733,25 @@ public final class ShutdownThread extends Thread {
                 try (BufferedReader reader = new BufferedReader(
                         new FileReader(UNCRYPT_STATUS_FILE))) {
 
-                    int lastStatus = Integer.MIN_VALUE;
+                    int last_status = Integer.MIN_VALUE;
                     while (true) {
                         String str = reader.readLine();
                         try {
                             int status = Integer.parseInt(str);
 
                             // Avoid flooding the log with the same message.
-                            if (status == lastStatus && lastStatus != Integer.MIN_VALUE) {
+                            if (status == last_status && last_status != Integer.MIN_VALUE) {
                                 continue;
                             }
-                            lastStatus = status;
+                            last_status = status;
 
                             if (status >= 0 && status < 100) {
                                 // Update status
                                 Log.d(TAG, "uncrypt read status: " + status);
-                                // Scale down to [MOUNT_SERVICE_STOP_PERCENT, 100).
-                                status = (int)(status * (100.0 - MOUNT_SERVICE_STOP_PERCENT) / 100);
-                                status += MOUNT_SERVICE_STOP_PERCENT;
-                                CharSequence msg = mContext.getText(
-                                        com.android.internal.R.string.reboot_to_update_package);
-                                sInstance.setRebootProgress(status, msg);
+                                sInstance.setUncryptProgress(status);
                             } else if (status == 100) {
                                 Log.d(TAG, "uncrypt successfully finished.");
-                                CharSequence msg = mContext.getText(
-                                        com.android.internal.R.string.reboot_to_update_reboot);
-                                sInstance.setRebootProgress(status, msg);
+                                sInstance.setUncryptProgress(status);
                                 break;
                             } else {
                                 // Error in /system/bin/uncrypt. Or it's rebooting to recovery
