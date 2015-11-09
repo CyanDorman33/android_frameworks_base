@@ -394,7 +394,6 @@ public final class ShutdownThread extends Thread {
 			pd.setCancelable(false);	
 
         pd.show();
-        }
 
         sInstance.mContext = context;
         sInstance.mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
