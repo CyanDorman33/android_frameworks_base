@@ -50,4 +50,7 @@
     <!-- screenshot in the power menu -->
     <string name="powermenu_screenshot">Screenshot</string>
 
+    <!-- Long-press back kill application -->
+    <string name="app_killed_message">Application killed</string>
+
 </resources>
