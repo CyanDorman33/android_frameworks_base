@@ -122,8 +122,6 @@ public class NavigationBarView extends LinearLayout {
     private OnTouchListener mHomeSearchActionListener;
     private OnLongClickListener mRecentsBackListener;
     private OnLongClickListener mLongPressHomeListener;
-
-    private SettingsObserver mSettingsObserver;
     private boolean mShowDpadArrowKeys;
 
     // performs manual animation in sync with layout transitions
@@ -252,12 +250,6 @@ public class NavigationBarView extends LinearLayout {
             root.setDrawDuringWindowsAnimating(true);
         }
         mSettingsObserver.observe();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        mSettingsObserver.unobserve();
     }
 
     @Override
@@ -862,7 +854,7 @@ public class NavigationBarView extends LinearLayout {
         setMenuVisibility(mShowMenu, true);
     }
 
-    private class SettingsObserver extends ContentObserver {
+    private class SettingsObserver extends UserContentObserver {
 
         SettingsObserver(Handler handler) {
             super(handler);
@@ -883,9 +875,10 @@ public class NavigationBarView extends LinearLayout {
             onChange(false);
         }
 
-        void unobserve() {
-            getContext().getContentResolver().unregisterContentObserver(this);
-        }
+        @Override
+        protected void unobserve() {
+            super.unobserve();
+            mContext.getContentResolver().unregisterContentObserver(this);
 
         @Override
         protected void update() {
@@ -903,7 +896,6 @@ public class NavigationBarView extends LinearLayout {
                 }
             }
             setNavigationIconHints(mNavigationIconHints, true);
-        }
         }
     }
 }
