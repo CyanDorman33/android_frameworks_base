@@ -894,12 +894,14 @@ public class NavigationBarView extends LinearLayout {
         protected void unobserve() {
             super.unobserve();
             mContext.getContentResolver().unregisterContentObserver(this);
+        }
 
         @Override
         protected void update() {
             mDoubleTapToSleep = Settings.System.getIntForUser(mContext.getContentResolver(),
                     Settings.System.DOUBLE_TAP_SLEEP_NAVBAR, 0, UserHandle.USER_CURRENT) != 0;
-
+        }
+        
         @Override
         public void onChange(boolean selfChange) {
             mShowDpadArrowKeys = Settings.System.getInt(mContext.getContentResolver(),
