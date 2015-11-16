@@ -831,7 +831,12 @@ public abstract class BaseStatusBar extends SystemUI implements
         }
 
         if (entry.icon != null) {
-            entry.icon.setTag(R.id.icon_is_pre_L, entry.targetSdk < Build.VERSION_CODES.LOLLIPOP);
+            if (entry.targetSdk >= Build.VERSION_CODES.LOLLIPOP) {
+                entry.icon.setColorFilter(mContext.getResources().getColor(
+                    R.color.notification_icon_color));
+            } else {
+                entry.icon.setColorFilter(null);
+            }
         }
     }
 
