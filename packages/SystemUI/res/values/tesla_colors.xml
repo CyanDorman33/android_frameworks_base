@@ -29,4 +29,7 @@
     <color name="status_bar_temperature_text_color">#FFFFFFFF</color>
     <color name="status_bar_temperature_location_text_color">#FFFFFFFF</color>
 
+    <!-- Expose Status Bar Tint for Notifications -->
+    <color name="notification_icon_color">#FFFFFFFF</color>
+
 </resources>
